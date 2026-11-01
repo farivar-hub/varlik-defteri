@@ -297,6 +297,7 @@ let draft=null,dirty=false,pending=null,saving=false;
 let hideAmt=store.get(HIDE_KEY)==='1';
 let started=false,loaded=false,dbState='ready',lastBackup=null,importPending=null;
 let isLocked=true;
+let rateHist={};
 let liveDoc={usd:49.65,eur:55.3,gold:6200,updatedAt:'2026-10-31T17:15:20+03:00'};
 const main=$('#main');
 function pickRates(o){const r={};['usd','eur','gold'].forEach(k=>{if(o&&o[k]>0)r[k]=o[k];});return r;}
@@ -408,6 +409,27 @@ function chartHTML(sF,sN){
   });
   return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Farivar ve Nurdan için aylık toplam varlık grafiği">'+g+'</svg>';
 }
+function dailyHTML(lF,lN){
+  const keys=Object.keys(rateHist).sort();if(!keys.length)return '';
+  const today=dayKey(),curK=keys[keys.length-1],cur=rateHist[curK];
+  const prevKs=keys.filter(k=>k<curK);
+  if(!prevKs.length)return '<section class="panel"><div class="ph"><h2>Dünden bu yana</h2></div><p class="muted small">Karşılaştırma için bir önceki günün kuru gerekiyor. Uygulamayı yarın açtığında burada TL farkı görünür.</p></section>';
+  const prevK=prevKs[prevKs.length-1],prev=rateHist[prevK];
+  let d=0,base=0,n=0;const per=[];
+  [['Farivar',lF],['Nurdan',lN]].forEach(x=>{
+    if(!x[1])return;
+    const a=valueOf(x[1].items,cur),b=valueOf(x[1].items,prev);
+    if(a==null||b==null)return;
+    d+=a-b;base+=b;n++;per.push([x[0],a-b]);
+  });
+  if(!n)return '';
+  const cls=d>0.5?'up':d<-0.5?'down':'flat',ar=cls==='up'?'▲':cls==='down'?'▼':'–';
+  const lab=k=>{const p=k.split('-');return +p[2]+' '+MONTHS[+p[1]-1];};
+  return '<section class="panel"><div class="ph"><h2>Dünden bu yana</h2><span class="muted small">'+lab(prevK)+' → '+lab(curK)+'</span></div>'
+   +'<p class="delta '+cls+'">'+amt('<span aria-hidden="true">'+ar+'</span> '+sgn(d)+(base?' · '+pct(d/Math.abs(base)*100):''))+'</p>'
+   +'<p class="muted small">'+per.map(x=>x[0]+' '+amt(sgn(x[1]))).join(' · ')+'</p>'
+   +'<p class="muted small" style="margin-top:6px">Son kayıtlı bakiyelerin, iki günün dolar, euro ve gram altın kuruyla değer farkı.'+(curK!==today?' Bugünün kuru henüz alınmadı.':'')+'</p></section>';
+}
 function renderOzet(){
   let h=dbNote();
   const sF=series('farivar'),sN=series('nur');
@@ -424,6 +446,7 @@ function renderOzet(){
   if(hasD)h+=deltaHTML(dSum,base!==0?dSum/Math.abs(base)*100:null,prevId);
   if(lF&&lN&&lF.id!==lN.id)h+='<p class="muted small" style="margin-top:6px">Farivar '+monthLabel(lF.id)+', Nurdan '+monthLabel(lN.id)+' kaydıyla hesaplandı.</p>';
   h+='</section>';
+  h+=dailyHTML(lF,lN);
   const cur=curMonthId(),hF=hasEntry(cur,'farivar'),hN=hasEntry(cur,'nur');
   if(!(hF&&hN)){
     h+='<div class="notice"><div><b>'+monthLabel(cur)+' kaydı</b><div class="pills"><span class="pill '+(hF?'ok':'wait')+'">Farivar '+(hF?'tamam':'bekliyor')+'</span><span class="pill '+(hN?'ok':'wait')+'">Nurdan '+(hN?'tamam':'bekliyor')+'</span></div></div><button type="button" class="btn" data-act="goto-giris" data-month="'+cur+'">Gir</button></div>';
@@ -638,14 +661,15 @@ function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTi
 /* ---------- yerel veri ---------- */
 const DATA_KEY='vd_data_v1';
 function persist(){
-  try{localStorage.setItem(DATA_KEY,JSON.stringify({v:1,months:months,rates:liveDoc,lastBackup:lastBackup}));return true;}
+  try{localStorage.setItem(DATA_KEY,JSON.stringify({v:1,months:months,rates:liveDoc,rateHist:rateHist,lastBackup:lastBackup}));return true;}
   catch(e){dbState='storage';return false;}
 }
 function loadLocal(){
   try{
     const raw=localStorage.getItem(DATA_KEY);
-    if(raw){const d=JSON.parse(raw);if(d&&d.months&&typeof d.months==='object')months=d.months;if(d&&d.rates)liveDoc=d.rates;lastBackup=d.lastBackup||null;}
+    if(raw){const d=JSON.parse(raw);if(d&&d.months&&typeof d.months==='object')months=d.months;if(d&&d.rates)liveDoc=d.rates;if(d&&d.rateHist&&typeof d.rateHist==='object')rateHist=d.rateHist;lastBackup=d.lastBackup||null;}
   }catch(e){dbState='storage';}
+  seedHist();
 }
 function startData(){
   if(started)return;started=true;
@@ -654,6 +678,8 @@ function startData(){
   render();
 }
 let fetching=false;
+const dayKey=iso=>{const d=iso?new Date(iso):new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());};
+function seedHist(){try{if(liveDoc&&liveDoc.updatedAt&&liveDoc.usd>0&&liveDoc.eur>0&&liveDoc.gold>0){const k=dayKey(liveDoc.updatedAt);rateHist[k]={usd:liveDoc.usd,eur:liveDoc.eur,gold:liveDoc.gold};}}catch(e){}}
 const isToday=iso=>{if(!iso)return false;const d=new Date(iso),t=new Date();return d.getFullYear()===t.getFullYear()&&d.getMonth()===t.getMonth()&&d.getDate()===t.getDate();};
 function numFrom(x){x=String(x);if(x.indexOf('.')>=0&&x.indexOf(',')>=0)x=x.replace(/\./g,'').replace(',','.');else x=x.replace(',','.');return parseFloat(x);}
 async function fetchRates(silent){
@@ -672,14 +698,14 @@ async function fetchRates(silent){
     const gold=pick([new RegExp('Has\\s*Alt[ıiİ]n[^0-9]{0,40}'+NUM,'i')]);
     if(!(usd>1&&usd<1000&&eur>1&&eur<1000&&eur>usd*0.5&&gold>100&&gold<200000))throw new Error('parse');
     liveDoc=Object.assign({},liveDoc,{usd:usd,eur:eur,gold:gold,updatedAt:new Date().toISOString()});
-    persist();
+    seedHist();persist();
     if(!silent){if(!draft)loadDraft();draft.rates={usd:numStr(usd),eur:numStr(eur),gold:numStr(gold)};dirty=true;toast('Kurlar getirildi');render();}
     else if(view==='giris'&&!dirty&&!editing()){loadDraft();render();}
   }catch(e){if(!silent)toast('Kurlar sayfadan alınamadı. Elle yazabilirsin.');}
   fetching=false;
 }
 function autoRates(){if(!isToday(liveDoc&&liveDoc.updatedAt))fetchRates(true);}
-function backupObj(){return {app:'varlik-defteri',v:1,exportedAt:new Date().toISOString(),months:months,rates:liveDoc};}
+function backupObj(){return {app:'varlik-defteri',v:1,exportedAt:new Date().toISOString(),months:months,rates:liveDoc,rateHist:rateHist};}
 async function exportBackup(){
   const name='varlik-defteri-'+new Date().toISOString().slice(0,10)+'.json';
   const blob=new Blob([JSON.stringify(backupObj(),null,1)],{type:'application/json'});
@@ -697,7 +723,7 @@ function readBackupFile(file){
     try{
       const d=JSON.parse(String(r.result));
       if(!d||d.app!=='varlik-defteri'||!d.months||typeof d.months!=='object')throw new Error('x');
-      importPending={months:d.months,rates:d.rates||null,count:Object.keys(d.months).length};
+      importPending={months:d.months,rates:d.rates||null,hist:(d.rateHist&&typeof d.rateHist==='object')?d.rateHist:null,count:Object.keys(d.months).length};
       view='ayar';render();
     }catch(e){toast('Bu dosya Varlık Defteri yedeği değil');}
   };
@@ -830,7 +856,7 @@ document.addEventListener('click',async e=>{
     case 'fetch-rates':await fetchRates(false);break;
     case 'backup-export':await exportBackup();break;
     case 'backup-pick':$('#impFile').click();break;
-    case 'import-yes':if(importPending){months=importPending.months;if(importPending.rates)liveDoc=importPending.rates;importPending=null;draft=null;dirty=false;persist();toast('Yedek yüklendi');render();}break;
+    case 'import-yes':if(importPending){months=importPending.months;if(importPending.rates)liveDoc=importPending.rates;if(importPending.hist)rateHist=importPending.hist;seedHist();importPending=null;draft=null;dirty=false;persist();toast('Yedek yüklendi');render();}break;
     case 'import-no':importPending=null;render();break;
     case 'forgot':msgEl.classList.remove('info');msgEl.textContent='Şifre bu cihazda saklanır, sıfırlanamaz. Unutursan Ayarlar > Safari > Gelişmiş > Web Sitesi Verileri içinden bu siteyi silip yedekten yükle.';break;
     case 'save':await save();break;
