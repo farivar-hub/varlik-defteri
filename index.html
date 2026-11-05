@@ -122,7 +122,7 @@ label.fl{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-
 .items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .irow{display:grid;grid-template-columns:1fr auto;gap:8px;padding:14px 0;border-top:1px solid var(--line)}
 .irow:first-child{border-top:0;padding-top:0}
-.irow .kind{grid-column:1} .irow .amtbox{grid-column:2;display:flex;align-items:center;gap:6px;width:150px}
+.irow .kind{grid-column:1} .irow .amtbox{grid-column:2;display:flex;align-items:center;gap:6px;width:190px;max-width:100%}
 .irow .conv{grid-column:1/-1;min-height:0}
 .irow .conv:empty{display:none}
 .amtbox .u{color:var(--muted);font-weight:600;min-width:16px}
@@ -273,6 +273,15 @@ const monthLabel=id=>{const p=id.split('-');return MONTHS[+p[1]-1]+' '+p[0]};
 const curMonthId=()=>{const d=new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1)};
 const uid=()=>Math.random().toString(36).slice(2,9);
 const numStr=n=>n==null||isNaN(n)?'':String(n).replace('.',',');
+const isExpr=s=>/[+\-−–]/.test(String(s==null?'':s).trim().replace(/^[+\-−–]/,''));
+function parseAmt(s){
+  if(s==null)return NaN;
+  const t=String(s).replace(/\s/g,'').replace(/[−–]/g,'-');
+  if(!isExpr(t))return parseNum(t);
+  const re=/([+-]?)([^+-]+)/g;let m,sum=0,used=0;
+  while((m=re.exec(t))){const n=parseNum(m[2]);if(isNaN(n))return NaN;sum+=(m[1]==='-'?-1:1)*n;used+=m[0].length;}
+  return used===t.length?sum:NaN;
+}
 function parseNum(s){
   if(s==null)return NaN;
   s=String(s).trim().replace(/\s/g,'').replace(/[₺$€]/g,'');
@@ -474,7 +483,7 @@ function calc(){
   let total=0,bad=0;const missing=new Set(),rates=parsedRates();
   draft.items.forEach(it=>{
     if(!it.name.trim()&&!String(it.amount).trim())return;
-    const a=parseNum(it.amount);if(isNaN(a)){bad++;return;}
+    const a=parseAmt(it.amount);if(isNaN(a)){bad++;return;}
     const k=KINDS[it.kind];let r=1;
     if(k.rate){r=rates[k.rate];if(!(r>0)){missing.add(k.rate);return;}}
     total+=k.sign*a*r;
@@ -494,11 +503,12 @@ function monthOptions(){
 }
 function kindOptions(sel){return Object.keys(KINDS).map(k=>'<option value="'+k+'"'+(k===sel?' selected':'')+'>'+KINDS[k].label+'</option>').join('');}
 function convText(it){
-  const k=KINDS[it.kind];if(!k.rate)return '';
-  const a=parseNum(it.amount);if(isNaN(a))return '';
+  const k=KINDS[it.kind],a=parseAmt(it.amount);
+  const sum=isExpr(it.amount)?(isNaN(a)?'Hesaplanamadı. Sayıları + veya − ile ayır.':'= '+amt(nf2.format(a)+' '+k.unit)):'';
+  if(!k.rate||isNaN(a))return sum;
   const r=parsedRates()[k.rate];
-  if(!(r>0))return RATES.find(x=>x.k===k.rate).label+' kuru bulunamadı';
-  return '≈ '+amt(tl(a*r));
+  if(!(r>0))return (sum?sum+' · ':'')+RATES.find(x=>x.k===k.rate).label+' kuru bulunamadı';
+  return (sum?sum+' · ':'')+'≈ '+amt(tl(a*r));
 }
 function itemRow(it){
   const k=KINDS[it.kind];
@@ -506,7 +516,7 @@ function itemRow(it){
     +'<input class="in" data-f="name" type="text" value="'+esc(it.name)+'" placeholder="Ad (ör. vadesiz hesap)" aria-label="Kalem adı" autocomplete="off" enterkeyhint="next">'
     +'<button type="button" class="icon-btn plain" data-act="del-item" data-id="'+it.id+'" aria-label="Kalemi sil">'+ICON.x+'</button>'
     +'<select class="in kind" data-f="kind" aria-label="Tür">'+kindOptions(it.kind)+'</select>'
-    +'<label class="amtbox"><input class="in" data-f="amount" inputmode="decimal" value="'+esc(it.amount)+'" placeholder="0" aria-label="Tutar" autocomplete="off"><span class="u">'+k.unit+'</span></label>'
+    +'<label class="amtbox"><input class="in" data-f="amount" inputmode="text" enterkeyhint="done" value="'+esc(it.amount)+'" placeholder="0" aria-label="Tutar" autocomplete="off"><span class="u">'+k.unit+'</span></label>'
     +'<p class="conv muted small">'+convText(it)+'</p></li>';
 }
 function renderGiris(){
@@ -536,7 +546,8 @@ function renderGiris(){
   }
   h+='<div class="row" style="margin-top:14px"><button type="button" class="btn" data-act="add-item">+ Kalem ekle</button>'
     +(!draft.items.length&&prevItemsId?'<button type="button" class="btn" data-act="copy-items">'+monthLabel(prevItemsId)+' kalemlerini getir</button>':'')+'</div>';
-  h+='<div class="subtotal"><span class="muted">'+P.name+' toplam</span><b id="subtotal"></b></div><p class="errline" id="calcMsg" role="alert"></p></section>';
+  h+='<p class="muted small" style="margin-top:10px">İpucu: tutar kutusuna <b>1000+250−75</b> gibi yazarsan uygulama toplar, sonucu altında gösterir.</p>'
+  +'<div class="subtotal"><span class="muted">'+P.name+' toplam</span><b id="subtotal"></b></div><p class="errline" id="calcMsg" role="alert"></p></section>';
   h+='<div class="savebar"><span class="st" id="saveSt"></span><button type="button" class="btn pri" id="saveBtn" data-act="save">Kaydet</button></div>';
   return h;
 }
@@ -571,7 +582,7 @@ async function save(){
   const c=calc();
   if(c.bad){toast('Tutarı geçersiz bir kalem var');return false;}
   if(c.missing.length){toast('Eksik kur: '+c.missing.map(k=>RATES.find(r=>r.k===k).label).join(', '));return false;}
-  const items=draft.items.filter(it=>it.name.trim()||String(it.amount).trim()).map(it=>({id:it.id,name:it.name.trim().slice(0,60),kind:it.kind,amount:parseNum(it.amount)}));
+  const items=draft.items.filter(it=>it.name.trim()||String(it.amount).trim()).map(it=>({id:it.id,name:it.name.trim().slice(0,60),kind:it.kind,amount:parseAmt(it.amount)}));
   if(!items.length){toast('En az bir kalem ekle');return false;}
   saving=true;paintSave();
   let ok=false;
