@@ -927,7 +927,7 @@ main.addEventListener('change',e=>{
 setMode(store.get(PIN_KEY)?'unlock':'setup1');
 detectBio();
 $('#impFile').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];e.target.value='';if(f)readBackupFile(f);});
-if('serviceWorker' in navigator&&/^https?:/.test(location.protocol)){navigator.serviceWorker.register('sw.js').catch(()=>{});}
+if('serviceWorker' in navigator&&/^https?:/.test(location.protocol)){const hadSW=!!navigator.serviceWorker.controller;navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>{try{r.update();}catch(e){}}).catch(()=>{});navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadSW&&!dirty){try{location.reload();}catch(e){}}});}
 })();
 </script>
 </body>
