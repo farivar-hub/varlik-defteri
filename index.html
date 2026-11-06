@@ -19,6 +19,7 @@
    Farivar mavi, Nurdan mor-pembe; artış/azalış renkleri kimlik renklerinden ayrı. */
 :root{
   --paper:#eef1f4; --surface:#ffffff; --raise:#e6ebf0; --ink:#14202b; --muted:#5b6977; --line:#d6dce3;
+  --k-tl:#4a78d8; --k-usd:#2e9e5b; --k-eur:#8a63d2; --k-altin:#d9a21b; --k-fon:#e1673f; --k-bes:#1fa6b8; --k-hisse:#c4469b; --k-diger:#8a8f98;
   --far:#2b50c8; --nur:#a1368a; --up:#17803f; --down:#bf3328; --accent:#0c6a62; --accent-ink:#ffffff;
   --warn-bg:#fff4dc; --warn-line:#e7c36b;
   --disp:ui-rounded,'SF Pro Rounded','Avenir Next',system-ui,-apple-system,sans-serif;
@@ -27,13 +28,15 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --paper:#0e151c; --surface:#16202a; --raise:#1d2935; --ink:#e8eef3; --muted:#92a1af; --line:#263340;
+    --k-tl:#7ea0f2; --k-usd:#55c585; --k-eur:#b497ee; --k-altin:#f0c14b; --k-fon:#f08e6b; --k-bes:#4cc7d8; --k-hisse:#e47dc0; --k-diger:#aab0b8;
     --far:#8aa4ff; --nur:#e792d3; --up:#4ec17f; --down:#ff8579; --accent:#3dbfb1; --accent-ink:#06211e;
     --warn-bg:#3a2f12; --warn-line:#7a6320; color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --paper:#0e151c; --surface:#16202a; --raise:#1d2935; --ink:#e8eef3; --muted:#92a1af; --line:#263340;
-  --far:#8aa4ff; --nur:#e792d3; --up:#4ec17f; --down:#ff8579; --accent:#3dbfb1; --accent-ink:#06211e;
+  --k-tl:#7ea0f2; --k-usd:#55c585; --k-eur:#b497ee; --k-altin:#f0c14b; --k-fon:#f08e6b; --k-bes:#4cc7d8; --k-hisse:#e47dc0; --k-diger:#aab0b8;
+    --far:#8aa4ff; --nur:#e792d3; --up:#4ec17f; --down:#ff8579; --accent:#3dbfb1; --accent-ink:#06211e;
   --warn-bg:#3a2f12; --warn-line:#7a6320; color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -106,6 +109,16 @@ label.fl{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-
 .sub{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:16px 0 0}
 .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-top:8px;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
+.pies{display:grid;gap:16px;grid-template-columns:1fr}
+@media (min-width:720px){.pies{grid-template-columns:1fr 1fr}}
+.pie{display:flex;flex-direction:column;align-items:center;gap:12px}
+.pie svg{width:min(190px,60vw);height:auto;display:block}
+.pie svg path,.pie svg circle{stroke:var(--surface);stroke-width:1.5}
+.pl{list-style:none;margin:0;padding:0;width:100%;display:grid;gap:6px;font-size:13px}
+.pl li{display:grid;grid-template-columns:12px 1fr auto auto;gap:8px;align-items:center;min-width:0}
+.pl i{width:12px;height:12px;border-radius:3px;display:block}
+.pl .p{font-weight:700;text-align:right;min-width:44px}
+.pl .t{color:var(--muted);text-align:right;min-width:72px}
 .chart{width:100%;height:auto;display:block}
 .chart .g{stroke:var(--line);stroke-width:1}
 .chart text{fill:var(--muted);font-size:10px;font-family:var(--body)}
@@ -356,15 +369,6 @@ function personCard(who,s){
       h+='<ul class="split"><li><span>Kur ve fiyat etkisi</span>'+amt(sgn(last.total-atPrev))+'</li><li><span>Birikim ve alım-satım</span>'+amt(sgn(atPrev-prev.total))+'</li></ul>';
     }
   }else{h+='<p class="muted small" style="margin-top:6px">Karşılaştırma için bir sonraki ayın kaydı gerekir.</p>';}
-  const groups={};
-  last.items.forEach(it=>{const v=itemVal(it,last.rates);groups[it.kind]=(groups[it.kind]||0)+v;});
-  const pos=Object.keys(groups).reduce((a,k)=>a+(groups[k]>0?groups[k]:0),0);
-  h+='<p class="sub">Dağılım</p><ul class="comp">';
-  Object.keys(groups).sort((a,b)=>Math.abs(groups[b])-Math.abs(groups[a])).forEach(k=>{
-    const v=groups[k],share=v>0&&pos>0?v/pos*100:0;
-    h+='<li><span>'+KINDS[k].label+(v>0&&pos>0?'<small>%'+nf0.format(rnd0(share))+'</small>':'')+'</span>'+amt(tl(v))+'<span class="bar"><i style="width:'+share.toFixed(1)+'%"></i></span></li>';
-  });
-  h+='</ul>';
   return h+'</article>';
 }
 const usdOf=e=>e&&e.rates&&e.rates.usd>0?e.total/e.rates.usd:null;
@@ -439,6 +443,28 @@ function dailyHTML(lF,lN){
    +'<p class="muted small">'+per.map(x=>x[0]+' '+amt(sgn(x[1]))).join(' · ')+'</p>'
    +'<p class="muted small" style="margin-top:6px">Son kayıtlı bakiyelerin, iki günün dolar, euro ve gram altın kuruyla değer farkı.'+(curK!==today?' Bugünün kuru henüz alınmadı.':'')+'</p></section>';
 }
+function pieHTML(who,entry){
+  const P=PERSONS[who];
+  const head='<h3 class="pie-h" style="margin:0;font-size:15px;color:var(--pc)"><span class="dot"></span> '+P.name+'</h3>';
+  if(!entry)return '<div class="pie '+P.cls+'">'+head+'<p class="muted small">Henüz kayıt yok.</p></div>';
+  const by={};let debt=0;
+  entry.items.forEach(it=>{const v=itemVal(it,entry.rates);if(v==null)return;const k=KINDS[it.kind]?it.kind:'diger';if(KINDS[k].sign<0)debt+=v;else by[k]=(by[k]||0)+v;});
+  const keys=Object.keys(by).filter(k=>by[k]>0).sort((a,b)=>by[b]-by[a]);
+  const tot=keys.reduce((a,k)=>a+by[k],0);
+  if(!tot)return '<div class="pie '+P.cls+'">'+head+'<p class="muted small">Dağılım için varlık kalemi yok.</p></div>';
+  const R=80,C=100;let ang=-Math.PI/2,g='';
+  if(keys.length===1)g='<circle cx="'+C+'" cy="'+C+'" r="'+R+'" fill="var(--k-'+keys[0]+')"/>';
+  else keys.forEach(k=>{
+    const a=by[k]/tot*2*Math.PI,a2=ang+a;
+    const x1=C+R*Math.cos(ang),y1=C+R*Math.sin(ang),x2=C+R*Math.cos(a2),y2=C+R*Math.sin(a2);
+    g+='<path d="M'+C+' '+C+' L'+x1.toFixed(2)+' '+y1.toFixed(2)+' A'+R+' '+R+' 0 '+(a>Math.PI?1:0)+' 1 '+x2.toFixed(2)+' '+y2.toFixed(2)+' Z" fill="var(--k-'+k+')"/>';
+    ang=a2;
+  });
+  const lg=keys.map(k=>'<li><i style="background:var(--k-'+k+')"></i><span>'+KINDS[k].label.replace(' nakit / mevduat','').replace(' (gram)','')+'</span><span class="p">'+amt(pct0(by[k]/tot*100))+'</span><span class="t">'+amt(tl(by[k]))+'</span></li>').join('');
+  return '<div class="pie '+P.cls+'">'+head+'<svg viewBox="0 0 200 200" role="img" aria-label="'+P.name+' varlık dağılımı">'+g+'</svg><ul class="pl">'+lg+'</ul>'
+    +(debt<0?'<p class="muted small" style="margin:0;width:100%">Borç: '+amt(tl(debt))+' (pastaya dahil değil)</p>':'')+'</div>';
+}
+const pct0=n=>'%'+nf1.format(n);
 function renderOzet(){
   let h=dbNote();
   const sF=series('farivar'),sN=series('nur');
@@ -456,16 +482,14 @@ function renderOzet(){
   if(lF&&lN&&lF.id!==lN.id)h+='<p class="muted small" style="margin-top:6px">Farivar '+monthLabel(lF.id)+', Nurdan '+monthLabel(lN.id)+' kaydıyla hesaplandı.</p>';
   h+='</section>';
   h+=dailyHTML(lF,lN);
+  h+='<section class="panel"><div class="ph"><h2>Varlık dağılımı</h2><span class="muted small">TL karşılığı, yüzde</span></div><div class="pies">'+pieHTML('farivar',lF)+pieHTML('nur',lN)+'</div></section>';
   const cur=curMonthId(),hF=hasEntry(cur,'farivar'),hN=hasEntry(cur,'nur');
   if(!(hF&&hN)){
     h+='<div class="notice"><div><b>'+monthLabel(cur)+' kaydı</b><div class="pills"><span class="pill '+(hF?'ok':'wait')+'">Farivar '+(hF?'tamam':'bekliyor')+'</span><span class="pill '+(hN?'ok':'wait')+'">Nurdan '+(hN?'tamam':'bekliyor')+'</span></div></div><button type="button" class="btn" data-act="goto-giris" data-month="'+cur+'">Gir</button></div>';
   }
   const lb=lastBackup?Date.now()-Date.parse(lastBackup):Infinity;
   if(lb>30*86400000)h+='<div class="notice warn"><div><b>Yedek al</b><p class="small">'+(lastBackup?'Son yedek: '+fmtDT(lastBackup):'Henüz yedek alınmadı')+'. Veriler yalnızca bu cihazda durur.</p></div><button type="button" class="btn" data-act="backup-export">Yedekle</button></div>';
-  const cb=combinedByMonth(sF,sN);
-  if(cb.length)h+='<section class="panel"><div class="ph"><h2>Aylık toplam</h2><span class="muted small">Farivar + Nurdan, ₺</span></div>'+barsHTML(cb)+'</section>';
   h+='<div class="cards">'+personCard('farivar',sF)+personCard('nur',sN)+'</div>';
-  h+='<section class="panel"><div class="ph"><h2>Kişi bazında seyir</h2><span class="muted small">TL karşılığı</span></div>'+chartHTML(sF,sN)+'<div class="legend"><span class="far"><i class="dot"></i>Farivar</span><span class="nur"><i class="dot"></i>Nurdan</span></div></section>';
   return h;
 }
 
